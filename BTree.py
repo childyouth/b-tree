@@ -7,11 +7,13 @@ class Node:
 
     def addKey(self, key, newsubtree=None):
         '''
+        해당 노드의 알맞은 key 순서에 삽입. subtree가 갱신될 필요가 있을때는 subtree또한 알맞은 순서에 삽입
         :param key:
         :param newsubtree:
         :return:
         '''
         idx = 0
+        # 가장 큰 값으로 들어간다면 idx를 반복문 밖에서 변경해야한다
         rightmost = True
         for i in range(len(self.keys)):
             idx = i
@@ -48,8 +50,14 @@ class BTree:
         self.M = M
         self.root = Node()
         self.data = dict()
+        self.leaf_cnt = dict()
 
     def search(self, queryKey):
+        '''
+        트리에 queryKey가 있는지 확인하고 없다면 -1을, 있다면 queryKey와 level을 반환
+        :param queryKey:
+        :return -1 or (queryKey, depth): 트리에서 queryKey가 검색이 안되는 경우 -1, 트리에 queryKey가 존재한다면 queryKey와 해당 key가 저장된 node의 level을 함께 반환
+        '''
         queryKey = int(queryKey)
         targetNode = self.root
         depth = 0
@@ -73,15 +81,29 @@ class BTree:
                     break
         return -1
 
-    def inorder_traversal(self, target:Node):
+
+    def inorder_traversal(self, level, target:Node):
         keys = []
+        level += 1
         if len(target.subtrees) == 0:
+            self.leaf_cnt[level] = self.leaf_cnt.get(level,0) + 1
             return target.keys
         for i in range(len(target.keys)):
-            keys += self.inorder_traversal(target.subtrees[i])
+            keys += self.inorder_traversal(level,target.subtrees[i])
             keys.append(target.keys[i])
-        keys += self.inorder_traversal(target.subtrees[len(target.keys)])
+        keys += self.inorder_traversal(level, target.subtrees[len(target.keys)])
         return keys
+
+
+    def leaf_level_chk(self, target:Node):
+        '''
+        모든 leaf node의 level을 저장하고 해당 level에 존재하는 node의 개수를 갖는 leaf_cnt(dict) 와 노드에 저장된 모든 key(list) 반환
+        :param target:
+        :return:
+        '''
+        self.leaf_cnt = dict()
+        return self.leaf_cnt, self.inorder_traversal(0,target)
+
 
     def insert(self, newkey):
         '''
