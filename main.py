@@ -6,7 +6,7 @@ from tqdm import tqdm
 # 데이터셋이 저장된 폴더
 DATASET_ROOT = "./dataset/"
 # B-Tree의 way 개수
-M_way = 41
+M_way = 3
 # nodes = [[5,2],[2,7],[1,9],[4,8],[8,22],[11,35],[3,55]]
 
 
@@ -68,9 +68,15 @@ if __name__ == "__main__":
             # 삭제기능 수행 후 비교할 파일 선택
             print("\n==== 삭제 후 비교할 파일 선택")
             _, _, COMPARE_PATH = file_select(DATASET_ROOT)
+            while True:
+                _,allkeys = btree.leaf_level_chk(btree.root)
+                print(allkeys)
+                btree.delete(int(input()))
         else:
             print("실행옵션이 잘못되었습니다")
             continue
+
+        # btree.root.subtrees[0].subtrees = []
 
         # 삽입, 삭제 후 기능이상을 확인하기 위해 검색, 저장, 비교
         # 검색, 저장
