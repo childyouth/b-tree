@@ -1,9 +1,10 @@
 from typing import List
+import math
 
 class Node:
     def __init__(self):
         self.keys = []
-        self.subtrees = []
+        self.subtrees:List[Node] = []
 
     def addKey(self, key, newsubtree=None):
         '''
@@ -44,16 +45,29 @@ class Node:
 
         return _key,newNode
 
+    def merge(self, otherNode:'Node', isMeBigger:bool, middleKey:int):
+        middleKey = [middleKey]
+        smaller = otherNode if isMeBigger else self
+        bigger = self if isMeBigger else otherNode
+        self.keys = smaller.keys + middleKey + bigger.keys
+        self.subtrees = smaller.subtrees + bigger.subtrees
+
 
 class BTree:
     def __init__(self, M):
         self.M = M
+        self.halfM = math.ceil(M/2) -1
         self.root = Node()
         self.data = dict()
         self.leaf_cnt = dict()
+
     def search(self, queryKey:int)->(int, (Node, int, List[Node])):
         """
         트리에 queryKey가 있는지 확인하고 없다면 -1을, 있다면 queryKey가 존재하는 노드를 반환
+
+        Node_info의 stack(list[Node]) 는 검색된 마지막 노드를 포함하고 있다.
+
+        Node_info-Node ∈ Node_info-list[Node]
 
         :param queryKey: 검색대상 key
         :return :
@@ -86,16 +100,16 @@ class BTree:
         return -1, (targetNode, len(targetNode.keys), stack)
 
 
-    def inorder_traversal(self, level, target:Node):
+    def _inorder_traversal(self, level, target:Node):
         keys = []
         level += 1
         if len(target.subtrees) == 0:
             self.leaf_cnt[level] = self.leaf_cnt.get(level,0) + 1
             return target.keys
         for i in range(len(target.keys)):
-            keys += self.inorder_traversal(level,target.subtrees[i])
+            keys += self._inorder_traversal(level,target.subtrees[i])
             keys.append(target.keys[i])
-        keys += self.inorder_traversal(level, target.subtrees[len(target.keys)])
+        keys += self._inorder_traversal(level, target.subtrees[len(target.keys)])
         return keys
 
 
@@ -106,7 +120,7 @@ class BTree:
         :return:
         '''
         self.leaf_cnt = dict()
-        return self.leaf_cnt, self.inorder_traversal(0,target)
+        return self.leaf_cnt, self._inorder_traversal(0,target)
 
 
     def insert(self, newkey):
@@ -116,6 +130,8 @@ class BTree:
         '''
         newkey = int(newkey)
         code, (targetNode,idx,stack) = self.search(newkey)
+        if code == 0:
+            return -1
         targetNode = stack.pop()
         finish = False
         newSubTree = None
@@ -138,5 +154,97 @@ class BTree:
         return 0
 
 
+    def find_replacement_key(self, node:Node, idx:int)-> (int, List[Node]):
+        # TODO 무조건 작은 key중 가장 큰 key로 가는게 아닌 양쪽 subtree를 모두 비교해 최적노드와 병합하도록 변경 (대체키가 소속된 노드가 가진 key값이 많은 쪽으로)
+        '''
+        노드의 바꿀 key 보다 작은 key 중 가장 큰 key의 index와 지나간 노드 stack을 반환하는 함수
+
+        정렬된 key set [ k1 , ... , replacement key, target key, ... , kn ]
+
+        Args:
+            node:
+            idx:
+
+        Returns:
+
+        '''
+        stack = []
+        stop = False
+        targetNode = node
+        while not stop:
+            if len(targetNode.subtrees) == 0:
+                stop = True
+            stack.append(targetNode)
+            if not stop:
+                targetNode = targetNode.subtrees[idx]
+            idx = len(targetNode.keys)
+        return idx-1, stack
+
+    def check_underflow(self, Node):
+        # root 는 절반조건인 underflow의 경우를 무시한다
+        if Node == self.root and len(self.root.keys) != 0:
+            return False
+        elif len(Node.keys) > self.halfM:
+            return False
+        return True
     def delete(self, delkey):
         delkey = int(delkey)
+        code, (targetNode, idx, stack) = self.search(delkey)
+        if code == -1:
+            return -1
+        targetNode = stack.pop()
+        # internal node check
+        if len(targetNode.subtrees) != 0:
+            tmpNode = targetNode
+            rplkeyidx, stack2 = self.find_replacement_key(targetNode,idx)
+            targetNode = stack2.pop()
+            stack += stack2
+            stack2 = None
+            tmpNode.keys[idx] = targetNode.keys[rplkeyidx]
+            tmpNode = None
+            idx = rplkeyidx
+            targetNode.keys[idx] = delkey
+        stop = False
+        if not self.check_underflow(targetNode):
+            stop = True
+        targetNode.keys.pop(idx)
+        siblingNode = targetNode
+
+        # 합병/재분배
+        while not stop:
+            if len(stack) == 0:
+                stop = True
+                if self.check_underflow(targetNode):
+                    self.root = siblingNode
+                continue
+            parentNode = stack.pop()
+            targetNodeidx = parentNode.subtrees.index(targetNode)
+            siblingidxs = []
+            if targetNodeidx != len(parentNode.subtrees) -1:
+                siblingidxs.append(targetNodeidx+1)
+            if targetNodeidx != 0:
+                siblingidxs.append(targetNodeidx-1)
+            siblingKeysizes = list(map(lambda idx: len(parentNode.subtrees[idx].keys), siblingidxs))
+            siblingidx = siblingidxs[siblingKeysizes.index(max(siblingKeysizes))]
+            siblingNode = parentNode.subtrees[siblingidx]
+            isSiblingBigger = bool(siblingidx - targetNodeidx +1)
+            middlekeyidx = targetNodeidx if isSiblingBigger else targetNodeidx-1
+            middleKey = parentNode.keys[middlekeyidx]
+            if max(max(siblingKeysizes),self.halfM) == self.halfM:
+                # 합병
+                siblingNode.merge(targetNode,isSiblingBigger,middleKey)
+                parentNode.keys.remove(middleKey)
+                parentNode.subtrees.remove(targetNode)
+                targetNode = parentNode
+            else:
+                # 재분배
+                siblingKey = siblingNode.keys.pop(0 if isSiblingBigger else len(siblingNode.keys)-1)
+                siblingSubtree = None
+                if len(siblingNode.subtrees) != 0:
+                    siblingSubtree = siblingNode.subtrees.pop(0 if isSiblingBigger else len(siblingNode.subtrees)-1)
+                parentNode.keys[middlekeyidx] = siblingKey
+                targetNode.addKey(middleKey,siblingSubtree)
+                stop = True
+
+
+
