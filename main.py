@@ -79,8 +79,8 @@ if __name__ == "__main__":
         savefile = open(SAVE_PATH,'w',encoding='utf8',newline='')
         writer = csv.writer(savefile, delimiter='\t')
         for k in tqdm(keys):
-            v = btree.search(k)
-            writer.writerow([k,"N/A" if v == -1 else btree.data[v[0]]])
+            rcode, (node,idx,_) = btree.search(k)
+            writer.writerow([k,"N/A" if rcode == -1 else btree.data[node.keys[idx]]])
         savefile.close()
         # B-Tree의 모든 leaf node들의 level을 확인
         # leaf_cnt(dict) 의 key가 하나 이상일 경우 잘못되었음을 확인 가능

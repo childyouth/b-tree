@@ -1,4 +1,4 @@
-
+from typing import List
 
 class Node:
     def __init__(self):
@@ -51,35 +51,39 @@ class BTree:
         self.root = Node()
         self.data = dict()
         self.leaf_cnt = dict()
+    def search(self, queryKey:int)->(int, (Node, int, List[Node])):
+        """
+        트리에 queryKey가 있는지 확인하고 없다면 -1을, 있다면 queryKey가 존재하는 노드를 반환
 
-    def search(self, queryKey):
-        '''
-        트리에 queryKey가 있는지 확인하고 없다면 -1을, 있다면 queryKey와 level을 반환
-        :param queryKey:
-        :return -1 or (queryKey, depth): 트리에서 queryKey가 검색이 안되는 경우 -1, 트리에 queryKey가 존재한다면 queryKey와 해당 key가 저장된 node의 level을 함께 반환
-        '''
+        :param queryKey: 검색대상 key
+        :return :
+            return_code(int): 트리에서 queryKey가 검색이 안되는 경우 -1, 검색 된 경우 0
+            Node_info(Node,int,list[Node]): return_code가 -1인 경우 (queryKey가 들어갈 후보 노드, 노드에 key를 삽입할 index, 노드 검색 stack),
+            트리에 queryKey가 존재한다면 (존재하는 노드, 노드에서 key의 index, 노드 검색 stack)
+        """
         queryKey = int(queryKey)
         targetNode = self.root
-        depth = 0
-        while targetNode is not None:
-            depth += 1
+        stack = []
+        stop = False
+        while not stop:
+            if len(targetNode.subtrees) == 0:
+                stop = True
+            stack.append(targetNode)
             rightmost = True
             for i in range(len(targetNode.keys)):
                 if targetNode.keys[i] == queryKey:
-                    return queryKey, depth
+                    return 0,(targetNode, i, stack)
                 if targetNode.keys[i] > queryKey:
-                    if len(targetNode.subtrees) != 0:
+                    if not stop:
                         targetNode = targetNode.subtrees[i]
                         rightmost = False
                         break
-                    return -1
+                    return -1,(targetNode, i, stack)
             if rightmost:
-                if len(targetNode.subtrees) != 0:
+                if not stop:
                     targetNode = targetNode.subtrees[len(targetNode.keys)]
-                    continue
-                else:
-                    break
-        return -1
+                continue
+        return -1, (targetNode, len(targetNode.keys), stack)
 
 
     def inorder_traversal(self, level, target:Node):
@@ -111,25 +115,13 @@ class BTree:
         :return INTEGER: -1 = key duplicated, 0 = inserted
         '''
         newkey = int(newkey)
-        stack = []
-        targetNode = self.root
-        while len(targetNode.subtrees) != 0:
-            stack.append(targetNode)
-            rightmost = True
-            for i in range(len(targetNode.keys)):
-                if targetNode.keys[i] == newkey:
-                    return -1
-                if targetNode.keys[i] > newkey:
-                    targetNode = targetNode.subtrees[i]
-                    rightmost = False
-                    break
-            if rightmost:
-                targetNode = targetNode.subtrees[len(targetNode.keys)]
-
+        code, (targetNode,idx,stack) = self.search(newkey)
+        targetNode = stack.pop()
         finish = False
         newSubTree = None
         while not finish:
             targetNode.addKey(newkey, newSubTree)
+            # overflow check
             if len(targetNode.keys) <= self.M-1:
                 finish = True
                 continue
@@ -144,3 +136,7 @@ class BTree:
                 self.root.subtrees += [targetNode, newSubTree]
                 finish = True
         return 0
+
+
+    def delete(self, delkey):
+        delkey = int(delkey)
