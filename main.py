@@ -57,6 +57,7 @@ if __name__ == "__main__":
             # 삽입
             # 삽입 기능 수행 시 B-Tree 초기화 ( 두 개의 파일을 연속해서 입력 불가능 )
             btree = BTree(M_way)
+            keys.clear()
             for k,v in tqdm(reader):
                 # 삽입된 Key를 순서대로 저장
                 keys.append(k)
@@ -68,10 +69,11 @@ if __name__ == "__main__":
             # 삭제기능 수행 후 비교할 파일 선택
             print("\n==== 삭제 후 비교할 파일 선택")
             _, _, COMPARE_PATH = file_select(DATASET_ROOT)
-            while True:
-                _,allkeys = btree.leaf_level_chk(btree.root)
-                print(allkeys)
-                btree.delete(int(input()))
+            for k,v in tqdm(reader):
+                if k == '34' or k == 34:
+                    tmp=0
+                if btree.delete(k) == -1:
+                    print("삭제할 키 {}가 존재하지 않습니다".format(k))
         else:
             print("실행옵션이 잘못되었습니다")
             continue
