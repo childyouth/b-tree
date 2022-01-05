@@ -6,11 +6,17 @@ class Node:
         self.keys = []
         self.subtrees:List[Node] = []
 
-    def addKey(self, key, newsubtree=None):
+    def addKey(self, key, newsubtree:'Node'=None, isMeBigger:bool=False):
         '''
         해당 노드의 알맞은 key 순서에 삽입. subtree가 갱신될 필요가 있을때는 subtree또한 알맞은 순서에 삽입
+
+        * 삽입 과정에서는 항상 self보다 큰 값을 넣은 새 노드가 삽입된다
+        * 삭제 과정에서는 인접한 두 형제노드 중 최적의 값을 삽입하게 되므로 newsubtree의 위치를 정해줘야 한다
+        * newsubtree의 위치를 정해주는 것이 isMeBigger flag이다
+
         :param key:
         :param newsubtree:
+        :param isMeBigger:
         :return:
         '''
         idx = 0
@@ -25,7 +31,10 @@ class Node:
             idx = len(self.keys)
         self.keys.insert(idx,key)
         if newsubtree is not None:
-            self.subtrees.insert(idx+1, newsubtree)
+            if isMeBigger:
+                self.subtrees.insert(idx, newsubtree)
+            else:
+                self.subtrees.insert(idx+1, newsubtree)
 
     def split(self, M):
         '''
@@ -46,6 +55,16 @@ class Node:
         return _key,newNode
 
     def merge(self, otherNode:'Node', isMeBigger:bool, middleKey:int):
+        '''
+        삭제과정에서 병합되는 노드
+        Args:
+            otherNode:
+            isMeBigger:
+            middleKey:
+
+        Returns:
+
+        '''
         middleKey = [middleKey]
         smaller = otherNode if isMeBigger else self
         bigger = self if isMeBigger else otherNode
@@ -187,6 +206,7 @@ class BTree:
         elif len(Node.keys) > self.halfM:
             return False
         return True
+
     def delete(self, delkey):
         delkey = int(delkey)
         code, (targetNode, idx, stack) = self.search(delkey)
@@ -243,8 +263,8 @@ class BTree:
                 if len(siblingNode.subtrees) != 0:
                     siblingSubtree = siblingNode.subtrees.pop(0 if isSiblingBigger else len(siblingNode.subtrees)-1)
                 parentNode.keys[middlekeyidx] = siblingKey
-                targetNode.addKey(middleKey,siblingSubtree)
+                targetNode.addKey(middleKey,siblingSubtree,not isSiblingBigger)
                 stop = True
-
+        return 0
 
 
