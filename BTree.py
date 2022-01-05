@@ -30,6 +30,7 @@ class Node:
         if rightmost:
             idx = len(self.keys)
         self.keys.insert(idx,key)
+        # key가 들어갈 위치를 알아도 subtree가 존재하던곳이 왼쪽(작은)인지 오른쪽(큰)인지에 따라 key의 앞에 설지 뒤에 설지 갈림
         if newsubtree is not None:
             if isMeBigger:
                 self.subtrees.insert(idx, newsubtree)
@@ -57,6 +58,9 @@ class Node:
     def merge(self, otherNode:'Node', isMeBigger:bool, middleKey:int):
         '''
         삭제과정에서 병합되는 노드
+
+        병합되는 형제노드가 큰지 작은지에 따라 더해지는 위치가 달라진다
+
         Args:
             otherNode:
             isMeBigger:
@@ -75,7 +79,7 @@ class Node:
 class BTree:
     def __init__(self, M):
         self.M = M
-        self.halfM = math.ceil(M/2) -1
+        self.HALF_M = math.ceil(M / 2) - 1
         self.root = Node()
         self.data = dict()
         self.leaf_cnt = dict()
@@ -149,6 +153,7 @@ class BTree:
         '''
         newkey = int(newkey)
         code, (targetNode,idx,stack) = self.search(newkey)
+        # 추가할 key가 이미 존재하는 경우
         if code == 0:
             return -1
         targetNode = stack.pop()
@@ -166,6 +171,7 @@ class BTree:
             if len(stack) > 0:
                 targetNode = stack.pop()
             else:
+                # root에서 분기 시 트리 높이 증가
                 self.root = Node()
                 self.root.keys.append(newkey)
                 self.root.subtrees += [targetNode, newSubTree]
@@ -195,7 +201,9 @@ class BTree:
                 stop = True
             stack.append(targetNode)
             if not stop:
+                # 인자로 들어오는 idx로 좌측 subtree로 향해야 하기 때문에 먼저 targetNode를 변경
                 targetNode = targetNode.subtrees[idx]
+            # 선행키를 찾기 위해 가장 큰 subtree로 향한다
             idx = len(targetNode.keys)
         return idx-1, stack
 
@@ -203,11 +211,19 @@ class BTree:
         # root 는 절반조건인 underflow의 경우를 무시한다
         if Node == self.root and len(self.root.keys) != 0:
             return False
-        elif len(Node.keys) > self.halfM:
+        elif len(Node.keys) > self.HALF_M:
             return False
         return True
 
     def delete(self, delkey):
+        '''
+        삭제대상이 없는경우 -1, 있는경우 해당되는 key를 삭제하고 0을 반환하는 b tree 삭제 연산
+        Args:
+            delkey:
+
+        Returns:
+
+        '''
         delkey = int(delkey)
         code, (targetNode, idx, stack) = self.search(delkey)
         if code == -1:
@@ -216,18 +232,25 @@ class BTree:
         # internal node check
         if len(targetNode.subtrees) != 0:
             tmpNode = targetNode
+            # 선행키를 찾는다.
+            # key가 존재하는 index는 subtree에서 해당 key보다 작은 subtree의 index와 같기 때문에 key의 index를 넣는다
             rplkeyidx, stack2 = self.find_replacement_key(targetNode,idx)
             targetNode = stack2.pop()
             stack += stack2
             stack2 = None
+            # internal node에 존재하던 삭제대상 key를 선행키 값으로 변경한다
             tmpNode.keys[idx] = targetNode.keys[rplkeyidx]
             tmpNode = None
+            # leaf node에 위치하게된 삭제대상 key의 index
             idx = rplkeyidx
             targetNode.keys[idx] = delkey
         stop = False
+        # 합병/재분배 과정이 필요없이 삭제가 가능한 경우 바로 종료할 수 있도록 한다
         if not self.check_underflow(targetNode):
             stop = True
         targetNode.keys.pop(idx)
+        # targetNode가 루트 노드이고 underflow가 발생하게 된다면 트리의 레벨을 줄이면서 root가 sibling을 가르키게 된다.
+        # sibling을 None으로 초기화 하는 경우 트리의 시작점을 잃게 되는경우가 존재할 수 있어 targetNode로 초기화한다.
         siblingNode = targetNode
 
         # 합병/재분배
@@ -238,31 +261,42 @@ class BTree:
                     self.root = siblingNode
                 continue
             parentNode = stack.pop()
+            # 부모노드의 subtrees에서 targetNode의 index
             targetNodeidx = parentNode.subtrees.index(targetNode)
+            # 부모노드의 subtrees에서 targetNode와 이웃한 형제노드(들)의 index
             siblingidxs = []
+            # targetNode가 양끝에 위치하는 경우 형제노드 후보는 한개뿐이다.
             if targetNodeidx != len(parentNode.subtrees) -1:
                 siblingidxs.append(targetNodeidx+1)
             if targetNodeidx != 0:
                 siblingidxs.append(targetNodeidx-1)
+            # 합병/재분배 과정을 선택하기 위해 형제노드들의 key 개수를 구한다
             siblingKeysizes = list(map(lambda idx: len(parentNode.subtrees[idx].keys), siblingidxs))
+            # 가장 많은 key를 가진 형제노드의 부모노드->subtrees 에서의 index
             siblingidx = siblingidxs[siblingKeysizes.index(max(siblingKeysizes))]
             siblingNode = parentNode.subtrees[siblingidx]
+            # 형제노드가 targetNode보다 큰지 판단하는 boolean. -1 or 1이 나오므로 boolean형 처리를 위해 +1
             isSiblingBigger = bool(siblingidx - targetNodeidx +1)
+            # 형제노드와 targetNode를 구분하는 중간키
             middlekeyidx = targetNodeidx if isSiblingBigger else targetNodeidx-1
             middleKey = parentNode.keys[middlekeyidx]
-            if max(max(siblingKeysizes),self.halfM) == self.halfM:
+            if max(max(siblingKeysizes), self.HALF_M) == self.HALF_M:
                 # 합병
+                # 모든 형제노드가 underflow 위험이 있는 경우 '합병'
                 siblingNode.merge(targetNode,isSiblingBigger,middleKey)
                 parentNode.keys.remove(middleKey)
                 parentNode.subtrees.remove(targetNode)
+                # 합병은 상위노드로 삭제전파된다
                 targetNode = parentNode
             else:
                 # 재분배
+                # 키를 더 많이 보유한 형제노드에게서 key를 끌어오는 '재분배'
                 siblingKey = siblingNode.keys.pop(0 if isSiblingBigger else len(siblingNode.keys)-1)
                 siblingSubtree = None
                 if len(siblingNode.subtrees) != 0:
                     siblingSubtree = siblingNode.subtrees.pop(0 if isSiblingBigger else len(siblingNode.subtrees)-1)
                 parentNode.keys[middlekeyidx] = siblingKey
+                # addKey에서 인자로 받는 boolean은 addKey 대상 노드가 더 큰가 이므로 not을 붙인다
                 targetNode.addKey(middleKey,siblingSubtree,not isSiblingBigger)
                 stop = True
         return 0
